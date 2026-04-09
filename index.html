@@ -1,133 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Joystick to Canvas</title>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      background: #f0f0f0;
-      font-family: Arial, sans-serif;
-    }
-    #status {
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-    #board {
-      border: 1px solid #333;
-      background: #fff;
-      image-rendering: crisp-edges;
-    }
-  </style>
-</head>
-<body>
-  <div id="status">Please connect a joystick!</div>
-  <canvas id="board" width="800" height="600" tabindex="0"></canvas>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let x = 100, y = 100; // Ball starting position
 
-  <script>
-    const canvas = document.getElementById('board');
-    const ctx = canvas.getContext('2d');
-    const statusEl = document.getElementById('status');
+function gameLoop() {
+  const gamepads = navigator.getGamepads();
+  if (gamepads[0]) {
+    const gp = gamepads[0];
+    
+    // gp.axes[0] is Left Stick X, gp.axes[1] is Left Stick Y
+    x += gp.axes[0] * 5; 
+    y += gp.axes[1] * 5;
+  }
 
-    const deadzone = 0.1;
-    const speed = 10;
+  // Draw the ball
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.arc(x, y, 20, 0, Math.PI * 2);
+  ctx.fillStyle = "blue";
+  ctx.fill();
 
-    // Player state
-    const player = {
-      x: canvas.width / 2,
-      y: canvas.height / 2,
-      radius: 10
-    };
+  requestAnimationFrame(gameLoop);
+}
 
-    let gamepadIndex = null;
-    let connected = false;
+window.addEventListener("gamepadconnected", () => {
+  console.log("Gamepad connected!");
+  gameLoop();
+});
 
-    function updateStatus() {
-      if (connected) {
-        statusEl.textContent = "Joystick connected (index " + gamepadIndex + ")";
-      } else {
-        statusEl.textContent = "Please connect a joystick!";
-      }
-    }
-
-    window.addEventListener("gamepadconnected", (e) => {
-      gamepadIndex = e.gamepad.index;
-      connected = true;
-      updateStatus();
-    });
-
-    window.addEventListener("gamepaddisconnected", (e) => {
-      if (gamepadIndex === e.gamepad.index) {
-        gamepadIndex = null;
-        connected = false;
-        updateStatus();
-      }
-    });
-
-    // Initialize status in case a gamepad is already connected
-    function initStatusFromPads() {
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (let i = 0; i < pads.length; i++) {
-        if (pads[i]) {
-          gamepadIndex = pads[i].index;
-          connected = true;
-          updateStatus();
-          return;
-        }
-      }
-      updateStatus();
-    }
-
-    function pollGamepad() {
-      const gp = navigator.getGamepads ? navigator.getGamepads()[gamepadIndex] : null;
-      if (!gp) return;
-
-      const moveX = gp.axes[0] || 0;
-      const moveY = gp.axes[1] || 0;
-
-      // Move only if outside deadzone
-      if (Math.abs(moveX) > deadzone || Math.abs(moveY) > deadzone) {
-        player.x += moveX * speed;
-        // Y is inverted on joysticks
-        player.y -= moveY * speed;
-
-        // Optional boundary clamping
-        if (player.x < player.radius) player.x = player.radius;
-        if (player.y < player.radius) player.y = player.radius;
-        if (player.x > canvas.width - player.radius) player.x = canvas.width - player.radius;
-        if (player.y > canvas.height - player.radius) player.y = canvas.height - player.radius;
-      }
-    }
-
-    function clear() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    function draw() {
-      // Draw the player as a circle
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#007bff';
-      ctx.fill();
-    }
-
-    function loop() {
-      if (connected) {
-        pollGamepad();
-      }
-      clear();
-      draw();
-      requestAnimationFrame(loop);
-    }
-
-    // Start
-    initStatusFromPads();
-    loop();
-  </script>
-</body>
-</html>
