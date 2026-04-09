@@ -1,76 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Joystick Circle Move</title>
+  <meta charset="UTF-8" />
+  <title>Joystick to Canvas</title>
   <style>
     body {
-      background: white;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
+      justify-content: center;
       height: 100vh;
       margin: 0;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
     }
-    canvas {
-      background: white;
+    #status {
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    #board {
+      border: 1px solid #333;
+      background: #fff;
+      image-rendering: crisp-edges;
     }
   </style>
 </head>
 <body>
-  <canvas id="c" width="600" height="400"></canvas>
+  <div id="status">Please connect a joystick!</div>
+  <canvas id="board" width="800" height="600" tabindex="0"></canvas>
+
   <script>
-    const canvas = document.getElementById('c');
+    const canvas = document.getElementById('board');
     const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
 
-    // Circle state
-    let x = canvas.width / 2;
-    let y = canvas.height / 2;
-    const radius = 20;
+    const deadzone = 0.1;
+    const speed = 10;
 
-    // Initial draw
-    function draw() {
+    // Player state
+    const player = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      radius: 10
+    };
+
+    let gamepadIndex = null;
+    let connected = false;
+
+    function updateStatus() {
+      if (connected) {
+        statusEl.textContent = "Joystick connected (index " + gamepadIndex + ")";
+      } else {
+        statusEl.textContent = "Please connect a joystick!";
+      }
+    }
+
+    window.addEventListener("gamepadconnected", (e) => {
+      gamepadIndex = e.gamepad.index;
+      connected = true;
+      updateStatus();
+    });
+
+    window.addEventListener("gamepaddisconnected", (e) => {
+      if (gamepadIndex === e.gamepad.index) {
+        gamepadIndex = null;
+        connected = false;
+        updateStatus();
+      }
+    });
+
+    // Initialize status in case a gamepad is already connected
+    function initStatusFromPads() {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (let i = 0; i < pads.length; i++) {
+        if (pads[i]) {
+          gamepadIndex = pads[i].index;
+          connected = true;
+          updateStatus();
+          return;
+        }
+      }
+      updateStatus();
+    }
+
+    function pollGamepad() {
+      const gp = navigator.getGamepads ? navigator.getGamepads()[gamepadIndex] : null;
+      if (!gp) return;
+
+      const moveX = gp.axes[0] || 0;
+      const moveY = gp.axes[1] || 0;
+
+      // Move only if outside deadzone
+      if (Math.abs(moveX) > deadzone || Math.abs(moveY) > deadzone) {
+        player.x += moveX * speed;
+        // Y is inverted on joysticks
+        player.y -= moveY * speed;
+
+        // Optional boundary clamping
+        if (player.x < player.radius) player.x = player.radius;
+        if (player.y < player.radius) player.y = player.radius;
+        if (player.x > canvas.width - player.radius) player.x = canvas.width - player.radius;
+        if (player.y > canvas.height - player.radius) player.y = canvas.height - player.radius;
+      }
+    }
+
+    function clear() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'blue';
+    }
+
+    function draw() {
+      // Draw the player as a circle
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#007bff';
       ctx.fill();
     }
 
-    draw();
-
-    // Movement in steps of 20
-    const step = 20;
-    function move(dx, dy) {
-      x += dx;
-      y += dy;
-
-      // Keep circle within canvas bounds
-      if (x < radius) x = radius;
-      if (x > canvas.width - radius) x = canvas.width - radius;
-      if (y < radius) y = radius;
-      if (y > canvas.height - radius) y = canvas.height - radius;
-
+    function loop() {
+      if (connected) {
+        pollGamepad();
+      }
+      clear();
       draw();
+      requestAnimationFrame(loop);
     }
 
-    // Keyboard bindings (Arrow keys)
-    window.addEventListener('keydown', (e) => {
-      switch (e.key) {
-        case 'ArrowUp':
-          move(0, -step);
-          break;
-        case 'ArrowDown':
-          move(0, step);
-          break;
-        case 'ArrowLeft':
-          move(-step, 0);
-          break;
-        case 'ArrowRight':
-          move(step, 0);
-          break;
-      }
-    });
+    // Start
+    initStatusFromPads();
+    loop();
   </script>
 </body>
 </html>
